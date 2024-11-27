@@ -8,6 +8,7 @@ import (
 )
 
 func TestCreate(t *testing.T) {
+	now := time.Now()
 	var user = User{
 		ID1:       1,
 		Name:      "philhuan",
@@ -16,7 +17,7 @@ func TestCreate(t *testing.T) {
 		Salary:    1.2,
 		CreatedAt: time.Time{},
 		UpdatedAt: time.Time{},
-		Date:      time.Now(),
+		Date:      time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local),
 		Score: map[string]int{
 			"English": 100,
 			"math":    101,

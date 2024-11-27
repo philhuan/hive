@@ -1,4 +1,4 @@
-package hive
+package serializer
 
 import (
 	"context"
@@ -8,10 +8,6 @@ import (
 
 	"gorm.io/gorm/schema"
 )
-
-func init() {
-	schema.RegisterSerializer("map", MapSerializer{})
-}
 
 // MapSerializer map serializer
 type MapSerializer struct{}
@@ -40,17 +36,21 @@ func (MapSerializer) Scan(ctx context.Context, field *schema.Field, dst reflect.
 	return
 }
 
-// Value implements serializer interface
+// Value MAP('math',120,'english', 123)
 func (MapSerializer) Value(ctx context.Context, field *schema.Field, dst reflect.Value, fieldValue interface{}) (interface{}, error) {
-	// TODO: not implemented
-	// MAP('math',120,'english', 123)
 
-	result, err := json.Marshal(fieldValue)
-	if string(result) == "null" {
+	if fieldValue == nil {
 		if field.TagSettings["NOT NULL"] != "" {
 			return "", nil
 		}
+		return nil, nil
+	}
+
+	w := ValueWriter{}
+	err := w.Value(reflect.ValueOf(fieldValue))
+	if err != nil {
 		return nil, err
 	}
-	return string(result), err
+	result := w.Bytes()
+	return result, nil
 }

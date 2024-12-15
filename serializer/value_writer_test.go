@@ -1,9 +1,10 @@
 package serializer
 
 import (
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValueWriter_Value(t *testing.T) {
@@ -50,6 +51,31 @@ func TestValueWriter_Value(t *testing.T) {
 				}),
 			},
 			want:    "named_struct(Name,philhuan,Addr,named_struct(Home,a1,Work,a2))",
+			wantErr: false,
+		},
+		{
+			name: "",
+			args: args{
+				rv: reflect.ValueOf([]int{1, 2, 3, 4, 5}),
+			},
+			want:    "ARRAY(1,2,3,4,5)",
+			wantErr: false,
+		},
+		{
+			name: "",
+			args: args{
+				rv: reflect.ValueOf([]map[string]string{
+					map[string]string{
+						"name": "philhuan",
+						"addr": "127.0.0.1",
+					},
+					map[string]string{
+						"name": "hjw",
+						"addr": "hjwblog.com",
+					},
+				}),
+			},
+			want:    "ARRAY(MAP('name','philhuan','addr','127.0.0.1'),MAP('name','hjw','addr','hjwblog.com'))",
 			wantErr: false,
 		},
 	}

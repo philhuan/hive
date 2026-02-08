@@ -1,4 +1,4 @@
-module gorm.io/driver/hive
+module github.com/philhuan/hive
 
 go 1.21
 

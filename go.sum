@@ -1,3 +1,5 @@
+github.com/apache/thrift v0.19.0 h1:sOqkWPzMj7w6XaYbJQG7m4sGqVolaW/0D28Ln7yPzMk=
+github.com/apache/thrift v0.19.0/go.mod h1:SUALL216IiaOw2Oy+5Vs9lboJ/t9g40C+G07Dc0QC1I=
 github.com/apache/thrift v0.20.0 h1:631+KvYbsBZxmuJjYwhezVsrfc/TbqtZV4QcxOX1fOI=
 github.com/apache/thrift v0.20.0/go.mod h1:hOk1BQqcp2OLzGsyVXdfMk7YFlMxK3aoEVhjD06QhB8=
 github.com/beltran/gohive v1.7.0 h1:Jvz6yrWuAAUWZ1Y84+24NjMcWYkUZZBUE7/sTWtLKY0=
@@ -14,8 +16,9 @@ github.com/jinzhu/inflection v1.0.0 h1:K317FqzuhWc8YvSVlFMCCUb36O/S9MCKRDI7QkRKD
 github.com/jinzhu/inflection v1.0.0/go.mod h1:h+uFLlag+Qp1Va5pdKtLDYj+kHp5pxUVkryuEj+Srlc=
 github.com/jinzhu/now v1.1.5 h1:/o9tlHleP7gOFmsnYNz3RGnqzefHA47wQpKrrdTIwXQ=
 github.com/jinzhu/now v1.1.5/go.mod h1:d3SSVoowX0Lcu0IBviAWJpolVfI5UJVZZ7cO71lE/z8=
-github.com/philhuan/gohive-driver v0.0.0-20240505104144-02a2ba691feb h1:r5sI2Xo6lIFpdTz6mEK6CQy5y/JqUikPnPBt7r72ogs=
 github.com/philhuan/gohive-driver v0.0.0-20240505104144-02a2ba691feb/go.mod h1:cO/NAy3jXD5cgksKBEp4o7xvUH7mulE4c7MvWXSvhJc=
+github.com/philhuan/gohive-driver v0.0.0-20241127005704-d7e8bd78a7e9 h1:NuzB+s0z1+hyjeBOrSFbhQ4j9N6iEPsNm8uGfS7sd/0=
+github.com/philhuan/gohive-driver v0.0.0-20241127005704-d7e8bd78a7e9/go.mod h1:cO/NAy3jXD5cgksKBEp4o7xvUH7mulE4c7MvWXSvhJc=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
@@ -28,3 +31,5 @@ gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gorm.io/gorm v1.25.9 h1:wct0gxZIELDk8+ZqF/MVnHLkA1rvYlBWUMv2EdsK1g8=
 gorm.io/gorm v1.25.9/go.mod h1:hbnx/Oo0ChWMn1BIhpy1oYozzpM15i4YPuHDmfYtwg8=
+sqlflow.org/gohive v0.0.0-20231130013447-c9657f0f21f9 h1:MJVi9OnD/tKNXdRlw3gNEDPNV72I4xwkaBBQdeHNayo=
+sqlflow.org/gohive v0.0.0-20231130013447-c9657f0f21f9/go.mod h1:OAU0/vkmdKfZ363QgGTChI35KIBsS63sZWDNWcFFcBM=

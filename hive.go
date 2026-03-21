@@ -8,6 +8,9 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/philhuan/gohive-driver"
+	"gorm.io/driver/hive/serializer"
+
 	"gorm.io/gorm/migrator"
 
 	"gorm.io/gorm"
@@ -16,6 +19,10 @@ import (
 	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 )
+
+func init() {
+	schema.RegisterSerializer("map", serializer.MapSerializer{})
+}
 
 const (
 	DriverName = "hive"
@@ -34,7 +41,8 @@ type Config struct {
 type Dialector struct {
 	*Config
 
-	logger logger.Interface
+	logger             logger.Interface
+	paramsInterpolator *gohive.ParamsInterpolator
 }
 
 var (
@@ -51,7 +59,10 @@ var (
 func Open(dsn string) gorm.Dialector {
 	dsnConf, _ := ParseDSN(dsn)
 	dsn = dsnConf.Complete().FormatDSN()
-	return &Dialector{Config: &Config{DSN: dsn, DSNConfig: dsnConf}}
+	return &Dialector{
+		Config:             &Config{DSN: dsn, DSNConfig: dsnConf},
+		paramsInterpolator: gohive.NewParamsInterpolator(),
+	}
 }
 
 func New(config Config) gorm.Dialector {
@@ -62,24 +73,27 @@ func New(config Config) gorm.Dialector {
 		config.DSNConfig, _ = ParseDSN(config.DSN)
 		config.DSNConfig.Complete()
 	}
-	return &Dialector{Config: &config}
+	return &Dialector{
+		Config:             &config,
+		paramsInterpolator: gohive.NewParamsInterpolator(),
+	}
 }
 
-func (dialector *Dialector) Name() string {
+func (d *Dialector) Name() string {
 	return DriverName
 }
 
-func (dialector *Dialector) Initialize(db *gorm.DB) (err error) {
-	dialector.logger = db.Logger
-	if dialector.DriverName == "" {
-		dialector.DriverName = DriverName
+func (d *Dialector) Initialize(db *gorm.DB) (err error) {
+	d.logger = db.Logger
+	if d.DriverName == "" {
+		d.DriverName = DriverName
 	}
 
-	if dialector.Conn != nil {
-		db.ConnPool = dialector.Conn
+	if d.Conn != nil {
+		db.ConnPool = d.Conn
 	} else {
-		dsn := dialector.DSNConfig.FormatDSN()
-		db.ConnPool, err = sql.Open(dialector.DriverName, dsn)
+		dsn := d.DSNConfig.FormatDSN()
+		db.ConnPool, err = sql.Open(d.DriverName, dsn)
 		if err != nil {
 			return err
 		}
@@ -92,7 +106,7 @@ func (dialector *Dialector) Initialize(db *gorm.DB) (err error) {
 		DeleteClauses: DeleteClauses,
 	}
 
-	dialector.RegisterCallbacks(db, callbackConfig)
+	d.RegisterCallbacks(db, callbackConfig)
 
 	if db.Config != nil {
 		db.Config.PrepareStmt = false
@@ -100,10 +114,18 @@ func (dialector *Dialector) Initialize(db *gorm.DB) (err error) {
 		db.Config.SkipDefaultTransaction = true
 	}
 
+	for k, v := range d.ClauseBuilders() {
+		db.ClauseBuilders[k] = v
+	}
+
+	if d.paramsInterpolator == nil {
+		d.paramsInterpolator = gohive.NewParamsInterpolator()
+	}
+
 	return nil
 }
 
-func (dialector *Dialector) RegisterCallbacks(db *gorm.DB, config *callbacks.Config) {
+func (d *Dialector) RegisterCallbacks(db *gorm.DB, config *callbacks.Config) {
 
 	if len(config.CreateClauses) == 0 {
 		config.CreateClauses = CreateClauses
@@ -119,76 +141,76 @@ func (dialector *Dialector) RegisterCallbacks(db *gorm.DB, config *callbacks.Con
 	}
 
 	createCallback := db.Callback().Create()
-	dialector.handleError(createCallback.Register("gorm:before_create", callbacks.BeforeCreate))
-	dialector.handleError(createCallback.Register("gorm:save_before_associations", callbacks.SaveBeforeAssociations(true)))
-	dialector.handleError(createCallback.Register("gorm:create", callbacks.Create(config)))
-	dialector.handleError(createCallback.Register("gorm:save_after_associations", callbacks.SaveAfterAssociations(true)))
-	dialector.handleError(createCallback.Register("gorm:after_create", callbacks.AfterCreate))
+	d.handleError(createCallback.Register("gorm:before_create", callbacks.BeforeCreate))
+	d.handleError(createCallback.Register("gorm:save_before_associations", callbacks.SaveBeforeAssociations(true)))
+	d.handleError(createCallback.Register("gorm:create", callbacks.Create(config)))
+	d.handleError(createCallback.Register("gorm:save_after_associations", callbacks.SaveAfterAssociations(true)))
+	d.handleError(createCallback.Register("gorm:after_create", callbacks.AfterCreate))
 	createCallback.Clauses = config.CreateClauses
 
 	queryCallback := db.Callback().Query()
-	dialector.handleError(queryCallback.Register("gorm:query", callbacks.Query))
-	dialector.handleError(queryCallback.Register("gorm:preload", callbacks.Preload))
-	dialector.handleError(queryCallback.Register("gorm:after_query", callbacks.AfterQuery))
+	d.handleError(queryCallback.Register("gorm:query", callbacks.Query))
+	d.handleError(queryCallback.Register("gorm:preload", callbacks.Preload))
+	d.handleError(queryCallback.Register("gorm:after_query", callbacks.AfterQuery))
 	queryCallback.Clauses = config.QueryClauses
 
 	deleteCallback := db.Callback().Delete()
-	dialector.handleError(deleteCallback.Register("gorm:before_delete", callbacks.BeforeDelete))
-	dialector.handleError(deleteCallback.Register("gorm:delete_before_associations", callbacks.DeleteBeforeAssociations))
-	dialector.handleError(deleteCallback.Register("gorm:delete", callbacks.Delete(config)))
-	dialector.handleError(deleteCallback.Register("gorm:after_delete", callbacks.AfterDelete))
+	d.handleError(deleteCallback.Register("gorm:before_delete", callbacks.BeforeDelete))
+	d.handleError(deleteCallback.Register("gorm:delete_before_associations", callbacks.DeleteBeforeAssociations))
+	d.handleError(deleteCallback.Register("gorm:delete", callbacks.Delete(config)))
+	d.handleError(deleteCallback.Register("gorm:after_delete", callbacks.AfterDelete))
 	deleteCallback.Clauses = config.DeleteClauses
 
 	updateCallback := db.Callback().Update()
-	dialector.handleError(updateCallback.Register("gorm:setup_reflect_value", callbacks.SetupUpdateReflectValue))
-	dialector.handleError(updateCallback.Register("gorm:before_update", callbacks.BeforeUpdate))
-	dialector.handleError(updateCallback.Register("gorm:save_before_associations", callbacks.SaveBeforeAssociations(false)))
-	dialector.handleError(updateCallback.Register("gorm:update", callbacks.Update(config)))
-	dialector.handleError(updateCallback.Register("gorm:save_after_associations", callbacks.SaveAfterAssociations(false)))
-	dialector.handleError(updateCallback.Register("gorm:after_update", callbacks.AfterUpdate))
+	d.handleError(updateCallback.Register("gorm:setup_reflect_value", callbacks.SetupUpdateReflectValue))
+	d.handleError(updateCallback.Register("gorm:before_update", callbacks.BeforeUpdate))
+	d.handleError(updateCallback.Register("gorm:save_before_associations", callbacks.SaveBeforeAssociations(false)))
+	d.handleError(updateCallback.Register("gorm:update", callbacks.Update(config)))
+	d.handleError(updateCallback.Register("gorm:save_after_associations", callbacks.SaveAfterAssociations(false)))
+	d.handleError(updateCallback.Register("gorm:after_update", callbacks.AfterUpdate))
 	updateCallback.Clauses = config.UpdateClauses
 
 	rowCallback := db.Callback().Row()
-	dialector.handleError(rowCallback.Register("gorm:row", callbacks.RowQuery))
+	d.handleError(rowCallback.Register("gorm:row", callbacks.RowQuery))
 	rowCallback.Clauses = config.QueryClauses
 
 	rawCallback := db.Callback().Raw()
-	dialector.handleError(rawCallback.Register("gorm:raw", callbacks.RawExec))
+	d.handleError(rawCallback.Register("gorm:raw", callbacks.RawExec))
 	rawCallback.Clauses = config.QueryClauses
 }
 
-func (dialector *Dialector) Migrator(db *gorm.DB) gorm.Migrator {
+func (d *Dialector) Migrator(db *gorm.DB) gorm.Migrator {
 	return Migrator{
 		Migrator: migrator.Migrator{
 			Config: migrator.Config{
 				DB:        db,
-				Dialector: dialector,
+				Dialector: d,
 			},
 		},
-		Dialector: dialector,
+		Dialector: d,
 	}
 }
 
-func (dialector *Dialector) DataTypeOf(field *schema.Field) string {
+func (d *Dialector) DataTypeOf(field *schema.Field) string {
 	switch field.DataType {
 	case schema.Bool:
 		return "boolean"
 	case schema.Int, schema.Uint:
-		return dialector.getSchemaIntAndUnitType(field)
+		return d.getSchemaIntAndUnitType(field)
 	case schema.Float:
-		return dialector.getSchemaFloatType(field)
+		return d.getSchemaFloatType(field)
 	case schema.String:
-		return dialector.getSchemaStringType(field)
+		return d.getSchemaStringType(field)
 	case schema.Time:
-		return dialector.getSchemaTimeType(field)
+		return d.getSchemaTimeType(field)
 	case schema.Bytes:
-		return dialector.getSchemaBytesType(field)
+		return d.getSchemaBytesType(field)
 	default:
-		return dialector.getSchemaCustomType(field)
+		return d.getSchemaCustomType(field)
 	}
 }
 
-func (dialector *Dialector) getSchemaIntAndUnitType(field *schema.Field) string {
+func (d *Dialector) getSchemaIntAndUnitType(field *schema.Field) string {
 	switch {
 	case field.Size <= 8:
 		return "tinyint"
@@ -201,7 +223,7 @@ func (dialector *Dialector) getSchemaIntAndUnitType(field *schema.Field) string 
 	}
 }
 
-func (dialector *Dialector) getSchemaFloatType(field *schema.Field) string {
+func (d *Dialector) getSchemaFloatType(field *schema.Field) string {
 	if field.Precision > 0 {
 		return fmt.Sprintf("decimal(%d, %d)", field.Precision, field.Scale)
 	}
@@ -213,32 +235,32 @@ func (dialector *Dialector) getSchemaFloatType(field *schema.Field) string {
 	return "double"
 }
 
-func (dialector *Dialector) getSchemaStringType(field *schema.Field) string {
+func (d *Dialector) getSchemaStringType(field *schema.Field) string {
 	return "String" // TODO: varchar?
 }
 
-func (dialector *Dialector) getSchemaTimeType(field *schema.Field) string {
+func (d *Dialector) getSchemaTimeType(field *schema.Field) string {
 	return "Timestamp" // TODO: DATE?
 }
 
-func (dialector *Dialector) getSchemaBytesType(field *schema.Field) string {
+func (d *Dialector) getSchemaBytesType(field *schema.Field) string {
 	return "BINARY"
 }
 
-func (dialector *Dialector) getSchemaCustomType(field *schema.Field) string {
+func (d *Dialector) getSchemaCustomType(field *schema.Field) string {
 	sqlType := string(field.DataType)
 	return sqlType
 }
 
-func (dialector *Dialector) DefaultValueOf(field *schema.Field) clause.Expression {
+func (d *Dialector) DefaultValueOf(field *schema.Field) clause.Expression {
 	return clause.Expr{SQL: "DEFAULT"}
 }
 
-func (dialector *Dialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement, v interface{}) {
+func (d *Dialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement, v interface{}) {
 	_ = writer.WriteByte('?')
 }
 
-func (dialector *Dialector) QuoteTo(writer clause.Writer, str string) {
+func (d *Dialector) QuoteTo(writer clause.Writer, str string) {
 	_ = writer.WriteByte('`')
 	if strings.Contains(str, ".") {
 		for idx, str := range strings.Split(str, ".") {
@@ -254,18 +276,18 @@ func (dialector *Dialector) QuoteTo(writer clause.Writer, str string) {
 	}
 }
 
-func (dialector *Dialector) Explain(sql string, vars ...interface{}) string {
+func (d *Dialector) Explain(sql string, vars ...interface{}) string {
 	return logger.ExplainSQL(sql, nil, `'`, vars...)
 }
 
-func (dialector *Dialector) getLogger() logger.Interface {
-	if dialector.logger == nil {
+func (d *Dialector) getLogger() logger.Interface {
+	if d.logger == nil {
 		return logger.Default
 	}
-	return dialector.logger
+	return d.logger
 }
 
-func (dialector *Dialector) handleError(err error, ignoreErrors ...error) {
+func (d *Dialector) handleError(err error, ignoreErrors ...error) {
 	if err != nil {
 		for _, except := range ignoreErrors {
 			if errors.Is(err, except) {
@@ -273,6 +295,6 @@ func (dialector *Dialector) handleError(err error, ignoreErrors ...error) {
 			}
 		}
 		_, file, line, _ := runtime.Caller(1)
-		dialector.getLogger().Warn(context.Background(), "%s:%d %v", file, line, err)
+		d.getLogger().Warn(context.Background(), "%s:%d %v", file, line, err)
 	}
 }
